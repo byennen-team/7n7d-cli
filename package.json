@@ -1,0 +1,30 @@
+{
+  "name": "@7n7d/cli",
+  "version": "0.1.0",
+  "description": "Terminal CLI for the 7N7D DeFi protocol",
+  "type": "module",
+  "bin": {
+    "7n7d": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@7n7d/sdk": "file:../7n7d-sdk",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "dotenv": "^16.4.5",
+    "inquirer": "^9.2.23",
+    "ora": "^8.0.1",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/inquirer": "^9.0.7",
+    "@types/node": "^22.0.0",
+    "tsup": "^8.2.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}
