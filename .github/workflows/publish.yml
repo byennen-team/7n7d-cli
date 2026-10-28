@@ -8,7 +8,7 @@ on:
       dry_run:
         description: 'Dry run (skip actual publish)'
         required: false
-        default: 'false'
+        default: 'true'
         type: boolean
 
 jobs:
@@ -19,11 +19,11 @@ jobs:
       id-token: write  # Required for npm provenance
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
@@ -39,7 +39,7 @@ jobs:
         run: npm run build
 
       - name: Publish to npm
-        if: ${{ (github.event_name == 'release' && github.event.release.target_commitish == 'main') || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false) }}
+        if: ${{ (github.event_name == 'release' && github.event.release.target_commitish == 'main') || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main') }}
         run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
