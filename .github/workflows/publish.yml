@@ -11,9 +11,11 @@ on:
         default: 'true'
         type: boolean
 
-# Serialize publishes so two manual runs can't race to publish the same version.
+# Serialize real publishes (release events and dispatches with dry_run=false) so
+# two can't race to publish the same version. Dry runs get a per-run group, so
+# they never queue behind, or displace, a pending release.
 concurrency:
-  group: npm-publish
+  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && format('npm-dry-run-{0}', github.run_id) || 'npm-publish' }}
   cancel-in-progress: false
 
 jobs:
