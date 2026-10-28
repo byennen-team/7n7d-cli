@@ -8,8 +8,19 @@ on:
       dry_run:
         description: 'Dry run (skip actual publish)'
         required: false
-        default: 'false'
+        default: 'true'
         type: boolean
+
+# Only runs that will actually publish (the same condition as the "Publish to npm"
+# step) share the npm-publish group, so two can't race to publish one version.
+# Every other run (dry runs, releases not targeting main) gets a per-run group,
+# so it never queues behind, or displaces, a pending publish.
+concurrency:
+  group: ${{ ((github.event_name == 'release' && github.event.release.target_commitish == 'main') || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main')) && 'npm-publish' || format('npm-no-publish-{0}', github.run_id) }}
+  cancel-in-progress: false
+
+# Deny by default; the publish job grants only what it needs.
+permissions: {}
 
 jobs:
   publish:
@@ -19,15 +30,16 @@ jobs:
       id-token: write  # Required for npm provenance
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-          cache: npm
+          # No dependency cache in the release workflow: a cache written by an untrusted
+          # run could be restored here and end up in the published package.
 
       - name: Install dependencies
         run: npm ci
@@ -39,7 +51,7 @@ jobs:
         run: npm run build
 
       - name: Publish to npm
-        if: ${{ (github.event_name == 'release' && github.event.release.target_commitish == 'main') || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false) }}
+        if: ${{ (github.event_name == 'release' && github.event.release.target_commitish == 'main') || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main') }}
         run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

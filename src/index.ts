@@ -13,7 +13,6 @@ program
   .description('CLI for the 7N7D DeFi Trading Vault')
   .version('0.1.0')
   .option('--network <network>', 'Network to use (testnet|mainnet)', 'testnet')
-  .option('--private-key <key>', 'Private key for write operations')
   .option('--rpc-url <url>', 'RPC URL')
   .hook('preAction', () => {
     console.log(BANNER)
