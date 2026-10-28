@@ -69,7 +69,6 @@ Read-only commands (`balance`, `status`) work without a private key. Write comma
 
 ```bash
 --network testnet|mainnet             # Default: testnet
---private-key <key>                   # Or set PRIVATE_KEY in .env
 --rpc-url <url>                       # Or set RPC_URL in .env
 ```
 
@@ -82,6 +81,7 @@ Read-only commands (`balance`, `status`) work without a private key. Write comma
 # Mainnet with flags
 7n7d status --network mainnet --rpc-url https://arb1.arbitrum.io/rpc
 
-# Deposit with private key flag
-7n7d deposit 100 --private-key 0x...
+# Deposit (reads PRIVATE_KEY from the environment or .env; there is no flag,
+# so the key never lands in shell history)
+7n7d deposit 100
 ```
