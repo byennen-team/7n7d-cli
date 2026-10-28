@@ -82,6 +82,7 @@ Read-only commands (`balance`, `status`) work without a private key. Write comma
 7n7d status --network mainnet --rpc-url https://arb1.arbitrum.io/rpc
 
 # Deposit (reads PRIVATE_KEY from the environment or .env; there is no flag,
-# so the key never lands in shell history)
+# so the key is never passed as a command-line argument. Prefer .env over an
+# inline PRIVATE_KEY=... prefix, which shells can save to history.)
 7n7d deposit 100
 ```

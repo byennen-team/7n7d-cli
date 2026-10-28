@@ -11,6 +11,11 @@ on:
         default: 'true'
         type: boolean
 
+# Serialize publishes so two manual runs can't race to publish the same version.
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
+
 jobs:
   publish:
     runs-on: ubuntu-latest
