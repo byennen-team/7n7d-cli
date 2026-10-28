@@ -11,12 +11,16 @@ on:
         default: 'true'
         type: boolean
 
-# Serialize real publishes (release events and dispatches with dry_run=false) so
-# two can't race to publish the same version. Dry runs get a per-run group, so
-# they never queue behind, or displace, a pending release.
+# Only runs that will actually publish (the same condition as the "Publish to npm"
+# step) share the npm-publish group, so two can't race to publish one version.
+# Every other run (dry runs, releases not targeting main) gets a per-run group,
+# so it never queues behind, or displaces, a pending publish.
 concurrency:
-  group: ${{ (github.event_name == 'workflow_dispatch' && inputs.dry_run) && format('npm-dry-run-{0}', github.run_id) || 'npm-publish' }}
+  group: ${{ ((github.event_name == 'release' && github.event.release.target_commitish == 'main') || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main')) && 'npm-publish' || format('npm-no-publish-{0}', github.run_id) }}
   cancel-in-progress: false
+
+# Deny by default; the publish job grants only what it needs.
+permissions: {}
 
 jobs:
   publish:
@@ -34,7 +38,8 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-          cache: npm
+          # No dependency cache in the release workflow: a cache written by an untrusted
+          # run could be restored here and end up in the published package.
 
       - name: Install dependencies
         run: npm ci
