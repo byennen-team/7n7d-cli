@@ -30,9 +30,17 @@ import {
   TEST_PRIVATE_KEY,
   TEST_RPC_URL,
   TEST_WALLET_ADDRESS,
+  waitFor,
 } from '../helpers/harness'
 
 const BASE = ['--rpc-url', TEST_RPC_URL, 'withdraw', '10']
+
+/**
+ * The real SDK returns pending shares as base units (18 decimals), so one
+ * share is 10^18. The CLI prints `withdrawalInfo.shares.toString()` without
+ * formatting them.
+ */
+const ONE_SHARE = 10n ** 18n
 
 describe('withdraw command', () => {
   let capture: ReturnType<typeof captureConsole>
@@ -87,6 +95,19 @@ describe('withdraw command', () => {
     expect(capture.logs.join('\n')).toContain('12.50')
   })
 
+  it('estimates a fractional share amount', async () => {
+    sdkDouble.overrides['vault.getSharePrice'] = async () => '1.25'
+    promptDouble.mockResolvedValue({ confirm: true })
+
+    const program = createProgram()
+    await program.parseAsync(
+      ['--rpc-url', TEST_RPC_URL, 'withdraw', '10.5'],
+      { from: 'user' },
+    )
+
+    expect(capture.logs.join('\n')).toContain('13.13')
+  })
+
   it('omits the pending notice when no withdrawal is pending', async () => {
     promptDouble.mockResolvedValue({ confirm: true })
 
@@ -98,8 +119,8 @@ describe('withdraw command', () => {
 
   it('reports a pending withdrawal that is ready', async () => {
     sdkDouble.overrides['vault.getWithdrawalInfo'] = async () => ({
-      shares: 5n,
-      assets: 5n,
+      shares: 5n * ONE_SHARE,
+      assets: 5n * ONE_SHARE,
       unlockTime: 0n,
       isReady: true,
     })
@@ -116,8 +137,8 @@ describe('withdraw command', () => {
 
   it('reports a pending withdrawal that is not ready yet', async () => {
     sdkDouble.overrides['vault.getWithdrawalInfo'] = async () => ({
-      shares: 5n,
-      assets: 5n,
+      shares: 5n * ONE_SHARE,
+      assets: 5n * ONE_SHARE,
       unlockTime: 123n,
       isReady: false,
     })
@@ -129,6 +150,45 @@ describe('withdraw command', () => {
     const output = capture.logs.join('\n')
     expect(output).toContain('You have a pending withdrawal')
     expect(output).toContain('No')
+  })
+
+  // Known display defect, pinned deliberately: the pending-share figure is
+  // printed as the raw base-unit bigint rather than a formatted share count,
+  // so 5 shares renders as 5000000000000000000. This test exists to make the
+  // defect visible and to force an update when it is fixed.
+  it('prints pending shares as raw base units (known display defect)', async () => {
+    sdkDouble.overrides['vault.getWithdrawalInfo'] = async () => ({
+      shares: 5n * ONE_SHARE,
+      assets: 5n * ONE_SHARE,
+      unlockTime: 0n,
+      isReady: true,
+    })
+    promptDouble.mockResolvedValue({ confirm: true })
+
+    const program = createProgram()
+    await program.parseAsync(BASE, { from: 'user' })
+
+    expect(capture.logs.join('\n')).toContain('5000000000000000000 shares')
+  })
+
+  it('does not withdraw while the confirmation is still pending', async () => {
+    let resolvePrompt: (value: { confirm: boolean }) => void = () => {}
+    promptDouble.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePrompt = resolve
+        }),
+    )
+
+    const program = createProgram()
+    const pending = program.parseAsync(BASE, { from: 'user' })
+
+    await waitFor(() => promptDouble.mock.calls.length > 0)
+    expect(sdkDouble.calledTransaction()).toBe(false)
+
+    resolvePrompt({ confirm: true })
+    await pending
+    expect(sdkDouble.callArgs('vault.withdraw')).toEqual([['10']])
   })
 
   it('cancels without any transaction', async () => {

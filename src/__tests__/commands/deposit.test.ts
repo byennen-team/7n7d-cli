@@ -30,6 +30,7 @@ import {
   TEST_PRIVATE_KEY,
   TEST_RPC_URL,
   TEST_WALLET_ADDRESS,
+  waitFor,
 } from '../helpers/harness'
 
 const BASE = ['--rpc-url', TEST_RPC_URL, 'deposit', '100']
@@ -106,6 +107,69 @@ describe('deposit command', () => {
 
     expect(sdkDouble.callArgs('vault.deposit')).toEqual([['100']])
     expect(sdkDouble.callCount('vault.depositWithApproval')).toBe(0)
+  })
+
+  it('treats an allowance a fraction below the amount as insufficient', async () => {
+    sdkDouble.overrides['vault.getAllowance'] = async () => '99.999999'
+    promptDouble.mockResolvedValue({ confirm: true })
+
+    const program = createProgram()
+    await program.parseAsync(BASE, { from: 'user' })
+
+    expect(sdkDouble.callArgs('vault.depositWithApproval')).toEqual([['100']])
+    expect(sdkDouble.callCount('vault.deposit')).toBe(0)
+  })
+
+  it('treats an allowance a fraction above the amount as sufficient', async () => {
+    sdkDouble.overrides['vault.getAllowance'] = async () => '100.000001'
+    promptDouble.mockResolvedValue({ confirm: true })
+
+    const program = createProgram()
+    await program.parseAsync(BASE, { from: 'user' })
+
+    expect(sdkDouble.callArgs('vault.deposit')).toEqual([['100']])
+    expect(sdkDouble.callCount('vault.depositWithApproval')).toBe(0)
+  })
+
+  // Known comparison defect, pinned deliberately: the allowance check uses
+  // parseFloat on both sides, so at 2^53 and above the comparison loses
+  // precision. Here the allowance is genuinely one unit short of the amount,
+  // but parseFloat collapses both to the same number, so the CLI believes the
+  // allowance is sufficient and requests no approval.
+  it('compares the allowance with float precision (known comparison defect)', async () => {
+    sdkDouble.overrides['vault.getAllowance'] = async () => '9007199254740992'
+    promptDouble.mockResolvedValue({ confirm: true })
+
+    const program = createProgram()
+    await program.parseAsync(
+      ['--rpc-url', TEST_RPC_URL, 'deposit', '9007199254740993'],
+      { from: 'user' },
+    )
+
+    expect(sdkDouble.callArgs('vault.deposit')).toEqual([['9007199254740993']])
+    expect(sdkDouble.callCount('vault.depositWithApproval')).toBe(0)
+  })
+
+  it('does not transact while the confirmation is still pending', async () => {
+    sdkDouble.overrides['vault.getAllowance'] = async () => '1000'
+
+    let resolvePrompt: (value: { confirm: boolean }) => void = () => {}
+    promptDouble.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePrompt = resolve
+        }),
+    )
+
+    const program = createProgram()
+    const pending = program.parseAsync(BASE, { from: 'user' })
+
+    await waitFor(() => promptDouble.mock.calls.length > 0)
+    expect(sdkDouble.calledTransaction()).toBe(false)
+
+    resolvePrompt({ confirm: true })
+    await pending
+    expect(sdkDouble.callArgs('vault.deposit')).toEqual([['100']])
   })
 
   it('cancels without any transaction when the allowance is sufficient', async () => {

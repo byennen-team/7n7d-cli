@@ -81,6 +81,19 @@ describe('createProgram', () => {
     expect(sdkDouble.instances[0].network).toBe('mainnet')
   })
 
+  // Known precedence defect, pinned deliberately: the --network option has a
+  // default of 'testnet', so program.opts().network is always set and
+  // createSDK() never falls back to the NETWORK environment variable. The env
+  // var is therefore ignored unless the flag is passed explicitly.
+  it('ignores the NETWORK environment variable in favour of the default (known defect)', async () => {
+    vi.stubEnv('NETWORK', 'mainnet')
+
+    const program = createProgram()
+    await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'status'], { from: 'user' })
+
+    expect(sdkDouble.instances[0].network).toBe('testnet')
+  })
+
   it('prints the banner before a command runs', async () => {
     const program = createProgram()
     await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'status'], { from: 'user' })

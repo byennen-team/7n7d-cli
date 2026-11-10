@@ -5,6 +5,22 @@ export function stripAnsi(value: string): string {
   return value.replace(/\x1B\[[0-9;]*m/g, '')
 }
 
+/**
+ * Poll until a condition holds.
+ *
+ * Used where an action is parked on a promise the test controls: the test
+ * needs to observe the state *while* that promise is still unresolved.
+ */
+export async function waitFor(condition: () => boolean, timeoutMs = 2_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  while (!condition()) {
+    if (Date.now() > deadline) {
+      throw new Error('timed out waiting for condition')
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5))
+  }
+}
+
 export class ExitSentinel extends Error {
   readonly exitCode: number
 

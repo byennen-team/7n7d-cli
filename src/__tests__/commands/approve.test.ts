@@ -30,6 +30,7 @@ import {
   TEST_PRIVATE_KEY,
   TEST_RPC_URL,
   TEST_WALLET_ADDRESS,
+  waitFor,
 } from '../helpers/harness'
 
 const BASE = ['--rpc-url', TEST_RPC_URL, 'approve', '1000']
@@ -89,6 +90,26 @@ describe('approve command', () => {
     expect(output).toContain('25')
     expect(output).toContain('New Allowance')
     expect(output).toContain('1000')
+  })
+
+  it('does not approve while the confirmation is still pending', async () => {
+    let resolvePrompt: (value: { confirm: boolean }) => void = () => {}
+    promptDouble.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvePrompt = resolve
+        }),
+    )
+
+    const program = createProgram()
+    const pending = program.parseAsync(BASE, { from: 'user' })
+
+    await waitFor(() => promptDouble.mock.calls.length > 0)
+    expect(sdkDouble.calledTransaction()).toBe(false)
+
+    resolvePrompt({ confirm: true })
+    await pending
+    expect(sdkDouble.callArgs('vault.approve')).toEqual([['1000']])
   })
 
   it('cancels without any transaction', async () => {

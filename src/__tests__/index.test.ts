@@ -1,20 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { waitFor } from './helpers/harness'
 
 const parseAsync = vi.fn()
 
 vi.mock('../cli.js', () => ({
   createProgram: () => ({ parseAsync }),
 }))
-
-async function waitFor(condition: () => boolean, timeoutMs = 2_000): Promise<void> {
-  const deadline = Date.now() + timeoutMs
-  while (!condition()) {
-    if (Date.now() > deadline) {
-      throw new Error('timed out waiting for condition')
-    }
-    await new Promise((resolve) => setTimeout(resolve, 5))
-  }
-}
 
 describe('entry point', () => {
   beforeEach(() => {
