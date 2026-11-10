@@ -102,13 +102,20 @@ describe('approve command', () => {
     )
 
     const program = createProgram()
-    const pending = program.parseAsync(BASE, { from: 'user' })
+    let failure: unknown
+    // Capture a rejection immediately: if the command fails before the
+    // prompt settles, an un-awaited rejection would surface as an unhandled
+    // rejection diagnostic instead of a test failure.
+    const pending = program.parseAsync(BASE, { from: 'user' }).catch((error) => {
+      failure = error
+    })
 
     await waitFor(() => promptDouble.mock.calls.length > 0)
     expect(sdkDouble.calledTransaction()).toBe(false)
 
     resolvePrompt({ confirm: true })
     await pending
+    expect(failure).toBeUndefined()
     expect(sdkDouble.callArgs('vault.approve')).toEqual([['1000']])
   })
 
