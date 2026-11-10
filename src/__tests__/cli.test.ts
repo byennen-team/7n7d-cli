@@ -71,6 +71,16 @@ describe('createProgram', () => {
     expect(longs).not.toContain('--private-key')
   })
 
+  it('passes the --network flag through to the SDK', async () => {
+    const program = createProgram()
+    await program.parseAsync(
+      ['--network', 'mainnet', '--rpc-url', TEST_RPC_URL, 'status'],
+      { from: 'user' },
+    )
+
+    expect(sdkDouble.instances[0].network).toBe('mainnet')
+  })
+
   it('prints the banner before a command runs', async () => {
     const program = createProgram()
     await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'status'], { from: 'user' })
