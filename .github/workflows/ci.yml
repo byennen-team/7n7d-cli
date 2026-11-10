@@ -12,20 +12,59 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      # The CLI depends on "@7n7d/sdk": "file:../7n7d-sdk". The SDK is
+      # checked out as a sibling directory at a pinned revision and built
+      # first, so npm, tsc, tsup and Node all resolve the real package
+      # instead of a dangling symlink.
+      - name: Checkout CLI
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+          path: cli
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - name: Checkout SDK (sibling)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: byennen-team/7n7d-sdk
+          ref: bd7eb3d7e82a177e8e4999170cb88084608c0c77
+          persist-credentials: false
+          path: 7n7d-sdk
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           cache: npm
+          cache-dependency-path: |
+            cli/package-lock.json
+            7n7d-sdk/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install SDK dependencies
+        working-directory: 7n7d-sdk
+        run: npm ci --no-audit --no-fund
 
+      - name: Build SDK
+        working-directory: 7n7d-sdk
+        run: npm run build
+
+      - name: Install CLI dependencies
+        working-directory: cli
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check
+        working-directory: cli
+        run: npm run typecheck
+
+      # No --if-present: a missing or failing test script must turn the build
+      # red instead of passing silently.
       - name: Test
-        run: npm test --if-present
+        working-directory: cli
+        run: npm run test:coverage
 
       - name: Build
+        working-directory: cli
         run: npm run build
+
+      - name: Smoke test the built CLI
+        working-directory: cli
+        run: node dist/index.js --help
