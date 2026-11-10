@@ -68,5 +68,11 @@ export function captureConsole(): ConsoleCapture {
 
 /** A syntactically valid 32-byte private key for wallet-present scenarios. */
 export const TEST_PRIVATE_KEY = `0x${'11'.repeat(32)}`
+
+/** An explicitly supplied address, distinct from the mocked wallet address. */
 export const TEST_ADDRESS = `0x${'1'.repeat(40)}`
+
+/** The address the SDK double derives from `TEST_PRIVATE_KEY`. */
+export const TEST_WALLET_ADDRESS = `0x${'2'.repeat(40)}`
+
 export const TEST_RPC_URL = 'http://127.0.0.1:8545'

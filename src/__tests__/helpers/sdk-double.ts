@@ -2,9 +2,10 @@
  * Test double for `@7n7d/sdk`.
  *
  * The CLI only ever talks to the SDK through `SevenNSevenD`, so the double
- * exposes the same surface (vault + token modules) and records every call.
- * Tests configure behaviour by installing an override and assert on the
- * recorded call log.
+ * exposes the same surface (vault + token modules) and records every call
+ * together with the arguments it received. Recording the arguments matters:
+ * a call log without them cannot tell `deposit('100')` apart from
+ * `deposit('1000000')`.
  */
 
 type Handler = (...args: unknown[]) => unknown
@@ -13,6 +14,11 @@ export interface SdkDoubleConfig {
   rpcUrl: string
   network?: string
   privateKey?: string
+}
+
+export interface SdkCall {
+  method: string
+  args: unknown[]
 }
 
 const VAULT_METHODS = [
@@ -59,7 +65,7 @@ const DEFAULTS: Record<string, unknown> = {
 
 export const sdkDouble = {
   instances: [] as SdkDouble[],
-  calls: [] as string[],
+  calls: [] as SdkCall[],
   overrides: {} as Record<string, Handler>,
 
   reset(): void {
@@ -68,15 +74,32 @@ export const sdkDouble = {
     this.overrides = {}
   },
 
-  /** Calls made against the SDK, in order. */
+  /** Method names, in call order. */
   callLog(): string[] {
-    return [...this.calls]
+    return this.calls.map((call) => call.method)
+  },
+
+  /** Every recorded call to one method, with its arguments. */
+  callsTo(method: string): SdkCall[] {
+    return this.calls.filter((call) => call.method === method)
+  },
+
+  /** Argument tuples for every call to one method. */
+  callArgs(method: string): unknown[][] {
+    return this.callsTo(method).map((call) => call.args)
+  },
+
+  /** How many times one method was called. */
+  callCount(method: string): number {
+    return this.callsTo(method).length
   },
 
   /** True when any transaction method was invoked. */
   calledTransaction(): boolean {
     return this.calls.some((call) =>
-      ['vault.approve', 'vault.deposit', 'vault.depositWithApproval', 'vault.withdraw'].includes(call),
+      ['vault.approve', 'vault.deposit', 'vault.depositWithApproval', 'vault.withdraw'].includes(
+        call.method,
+      ),
     )
   },
 }
@@ -86,7 +109,7 @@ function buildModule(prefix: 'vault' | 'token', methods: readonly string[]): Rec
   for (const method of methods) {
     const key = `${prefix}.${method}`
     module[method] = async (...args: unknown[]) => {
-      sdkDouble.calls.push(key)
+      sdkDouble.calls.push({ method: key, args })
       const override = sdkDouble.overrides[key]
       if (override) {
         return override(...args)
@@ -106,7 +129,9 @@ export class SdkDouble {
 
   constructor(config: SdkDoubleConfig) {
     this.config = config
-    this.address = config.privateKey ? `0x${'1'.repeat(40)}` : undefined
+    // Deliberately different from TEST_ADDRESS, so a test can tell an
+    // explicitly supplied address apart from the wallet fallback.
+    this.address = config.privateKey ? `0x${'2'.repeat(40)}` : undefined
     this.network = config.network ?? 'testnet'
     this.vault = buildModule('vault', VAULT_METHODS)
     this.token = buildModule('token', TOKEN_METHODS)

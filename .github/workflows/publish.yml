@@ -52,10 +52,6 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-          cache: npm
-          cache-dependency-path: |
-            cli/package-lock.json
-            7n7d-sdk/package-lock.json
           # No dependency cache in the release workflow: a cache written by an untrusted
           # run could be restored here and end up in the published package.
 

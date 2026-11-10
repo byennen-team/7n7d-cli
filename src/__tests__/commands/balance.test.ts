@@ -24,6 +24,7 @@ import {
   TEST_ADDRESS,
   TEST_PRIVATE_KEY,
   TEST_RPC_URL,
+  TEST_WALLET_ADDRESS,
 } from '../helpers/harness'
 
 describe('balance command', () => {
@@ -35,6 +36,9 @@ describe('balance command', () => {
     capture = captureConsole()
     exits = installExitSentinel()
     vi.stubEnv('PRIVATE_KEY', '')
+    // Pin the RPC URL so the preflight path does not depend on the
+    // developer's own environment.
+    vi.stubEnv('RPC_URL', '')
   })
 
   afterEach(() => {
@@ -47,8 +51,8 @@ describe('balance command', () => {
     const program = createProgram()
     await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'balance', TEST_ADDRESS], { from: 'user' })
 
-    expect(sdkDouble.callLog()).toContain('vault.getBalance')
-    expect(sdkDouble.callLog()).toContain('token.getBalance')
+    expect(sdkDouble.callArgs('vault.getBalance')).toEqual([[TEST_ADDRESS]])
+    expect(sdkDouble.callArgs('token.getBalance')).toEqual([[TEST_ADDRESS]])
     expect(capture.logs.join('\n')).toContain('Vault Position')
     expect(capture.logs.join('\n')).toContain(TEST_ADDRESS)
     expect(exits.codes).toEqual([])
@@ -60,7 +64,7 @@ describe('balance command', () => {
     const program = createProgram()
     await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'balance'], { from: 'user' })
 
-    expect(sdkDouble.callLog()).toContain('vault.getBalance')
+    expect(sdkDouble.callArgs('vault.getBalance')).toEqual([[TEST_WALLET_ADDRESS]])
     expect(capture.logs.join('\n')).toContain('Vault Position')
   })
 
@@ -73,7 +77,8 @@ describe('balance command', () => {
 
     expect(exits.codes).toEqual([1])
     expect(capture.errors.join('\n')).toContain('Provide an address argument or set a private key')
-    expect(sdkDouble.callLog()).toEqual([])
+    expect(sdkDouble.callCount('vault.getBalance')).toBe(0)
+    expect(sdkDouble.callCount('token.getBalance')).toBe(0)
   })
 
   it('rejects on the preflight failure when no RPC URL is configured', async () => {
@@ -83,6 +88,7 @@ describe('balance command', () => {
 
     expect(exits.codes).toEqual([])
     expect(capture.errors).toEqual([])
+    expect(sdkDouble.callCount('vault.getBalance')).toBe(0)
   })
 
   it('reports a failed balance fetch and exits', async () => {
@@ -98,5 +104,6 @@ describe('balance command', () => {
 
     expect(exits.codes).toEqual([1])
     expect(capture.errors.join('\n')).toContain('rpc down')
+    expect(sdkDouble.callArgs('vault.getBalance')).toEqual([[TEST_ADDRESS]])
   })
 })

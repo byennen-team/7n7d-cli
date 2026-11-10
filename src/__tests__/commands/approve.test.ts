@@ -29,6 +29,7 @@ import {
   installExitSentinel,
   TEST_PRIVATE_KEY,
   TEST_RPC_URL,
+  TEST_WALLET_ADDRESS,
 } from '../helpers/harness'
 
 const BASE = ['--rpc-url', TEST_RPC_URL, 'approve', '1000']
@@ -45,6 +46,7 @@ describe('approve command', () => {
     capture = captureConsole()
     exits = installExitSentinel()
     vi.stubEnv('PRIVATE_KEY', TEST_PRIVATE_KEY)
+    vi.stubEnv('RPC_URL', '')
   })
 
   afterEach(() => {
@@ -59,10 +61,20 @@ describe('approve command', () => {
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
-    expect(sdkDouble.callLog()).toContain('vault.approve')
+    expect(sdkDouble.callArgs('vault.approve')).toEqual([['1000']])
+    expect(sdkDouble.callCount('vault.approve')).toBe(1)
     expect(spinnerDouble.succeed).toHaveBeenCalledWith('USDC approved')
     expect(capture.logs.join('\n')).toContain('0xapprove')
     expect(exits.codes).toEqual([])
+  })
+
+  it('reads the allowance for the wallet address', async () => {
+    promptDouble.mockResolvedValue({ confirm: true })
+
+    const program = createProgram()
+    await program.parseAsync(BASE, { from: 'user' })
+
+    expect(sdkDouble.callArgs('vault.getAllowance')).toEqual([[TEST_WALLET_ADDRESS]])
   })
 
   it('shows the current and new allowance before prompting', async () => {
@@ -85,6 +97,7 @@ describe('approve command', () => {
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
+    expect(sdkDouble.callCount('vault.approve')).toBe(0)
     expect(sdkDouble.calledTransaction()).toBe(false)
     expect(capture.logs.join('\n')).toContain('Cancelled')
   })
@@ -99,6 +112,7 @@ describe('approve command', () => {
     ).rejects.toThrow(/Private key required/)
 
     expect(exits.codes).toEqual([])
+    expect(sdkDouble.calledTransaction()).toBe(false)
   })
 
   it('reports a failed allowance read and exits', async () => {
@@ -128,5 +142,6 @@ describe('approve command', () => {
 
     expect(exits.codes).toEqual([1])
     expect(capture.errors.join('\n')).toContain('approval failed')
+    expect(sdkDouble.callArgs('vault.approve')).toEqual([['1000']])
   })
 })

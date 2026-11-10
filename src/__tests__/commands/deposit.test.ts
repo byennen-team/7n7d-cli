@@ -29,6 +29,7 @@ import {
   installExitSentinel,
   TEST_PRIVATE_KEY,
   TEST_RPC_URL,
+  TEST_WALLET_ADDRESS,
 } from '../helpers/harness'
 
 const BASE = ['--rpc-url', TEST_RPC_URL, 'deposit', '100']
@@ -45,6 +46,7 @@ describe('deposit command', () => {
     capture = captureConsole()
     exits = installExitSentinel()
     vi.stubEnv('PRIVATE_KEY', TEST_PRIVATE_KEY)
+    vi.stubEnv('RPC_URL', '')
   })
 
   afterEach(() => {
@@ -53,35 +55,46 @@ describe('deposit command', () => {
     vi.unstubAllEnvs()
   })
 
-  it('deposits directly when the allowance already covers the amount', async () => {
+  it('deposits the requested amount when the allowance already covers it', async () => {
     sdkDouble.overrides['vault.getAllowance'] = async () => '1000'
     promptDouble.mockResolvedValue({ confirm: true })
 
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
-    expect(sdkDouble.callLog()).toContain('vault.deposit')
-    expect(sdkDouble.callLog()).not.toContain('vault.depositWithApproval')
+    expect(sdkDouble.callArgs('vault.deposit')).toEqual([['100']])
+    expect(sdkDouble.callCount('vault.deposit')).toBe(1)
+    expect(sdkDouble.callCount('vault.depositWithApproval')).toBe(0)
     expect(spinnerDouble.succeed).toHaveBeenCalledWith('Deposit successful')
     expect(exits.codes).toEqual([])
   })
 
-  it('approves first when the allowance is below the amount', async () => {
+  it('approves the requested amount first when the allowance is below it', async () => {
     sdkDouble.overrides['vault.getAllowance'] = async () => '10'
     promptDouble.mockResolvedValue({ confirm: true })
 
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
-    const log = sdkDouble.callLog()
-    expect(log).toContain('vault.depositWithApproval')
-    expect(log).not.toContain('vault.deposit')
+    expect(sdkDouble.callArgs('vault.depositWithApproval')).toEqual([['100']])
+    expect(sdkDouble.callCount('vault.depositWithApproval')).toBe(1)
+    expect(sdkDouble.callCount('vault.deposit')).toBe(0)
 
     const output = capture.logs.join('\n')
     expect(output).toContain('USDC approval needed')
     expect(spinnerDouble.succeed).toHaveBeenCalledWith('USDC approved')
     expect(output).toContain('0xapprove')
     expect(output).toContain('0xdeposit')
+  })
+
+  it('reads the allowance for the wallet address', async () => {
+    sdkDouble.overrides['vault.getAllowance'] = async () => '1000'
+    promptDouble.mockResolvedValue({ confirm: true })
+
+    const program = createProgram()
+    await program.parseAsync(BASE, { from: 'user' })
+
+    expect(sdkDouble.callArgs('vault.getAllowance')).toEqual([[TEST_WALLET_ADDRESS]])
   })
 
   it('treats an allowance equal to the amount as sufficient', async () => {
@@ -91,8 +104,8 @@ describe('deposit command', () => {
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
-    expect(sdkDouble.callLog()).toContain('vault.deposit')
-    expect(sdkDouble.callLog()).not.toContain('vault.depositWithApproval')
+    expect(sdkDouble.callArgs('vault.deposit')).toEqual([['100']])
+    expect(sdkDouble.callCount('vault.depositWithApproval')).toBe(0)
   })
 
   it('cancels without any transaction when the allowance is sufficient', async () => {
@@ -102,6 +115,8 @@ describe('deposit command', () => {
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
+    expect(sdkDouble.callCount('vault.deposit')).toBe(0)
+    expect(sdkDouble.callCount('vault.depositWithApproval')).toBe(0)
     expect(sdkDouble.calledTransaction()).toBe(false)
     expect(capture.logs.join('\n')).toContain('Cancelled')
   })
@@ -113,6 +128,8 @@ describe('deposit command', () => {
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
+    expect(sdkDouble.callCount('vault.deposit')).toBe(0)
+    expect(sdkDouble.callCount('vault.depositWithApproval')).toBe(0)
     expect(sdkDouble.calledTransaction()).toBe(false)
     expect(capture.logs.join('\n')).toContain('Cancelled')
   })
@@ -128,6 +145,7 @@ describe('deposit command', () => {
 
     expect(exits.codes).toEqual([])
     expect(capture.errors).toEqual([])
+    expect(sdkDouble.calledTransaction()).toBe(false)
   })
 
   it('reports a failed preview read and exits', async () => {
@@ -170,5 +188,6 @@ describe('deposit command', () => {
 
     expect(exits.codes).toEqual([1])
     expect(capture.errors.join('\n')).toContain('deposit failed')
+    expect(sdkDouble.callArgs('vault.deposit')).toEqual([['100']])
   })
 })

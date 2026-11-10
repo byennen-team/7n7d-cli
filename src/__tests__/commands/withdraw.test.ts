@@ -29,6 +29,7 @@ import {
   installExitSentinel,
   TEST_PRIVATE_KEY,
   TEST_RPC_URL,
+  TEST_WALLET_ADDRESS,
 } from '../helpers/harness'
 
 const BASE = ['--rpc-url', TEST_RPC_URL, 'withdraw', '10']
@@ -45,6 +46,7 @@ describe('withdraw command', () => {
     capture = captureConsole()
     exits = installExitSentinel()
     vi.stubEnv('PRIVATE_KEY', TEST_PRIVATE_KEY)
+    vi.stubEnv('RPC_URL', '')
   })
 
   afterEach(() => {
@@ -53,15 +55,26 @@ describe('withdraw command', () => {
     vi.unstubAllEnvs()
   })
 
-  it('requests a withdrawal after confirmation', async () => {
+  it('requests the given number of shares after confirmation', async () => {
     promptDouble.mockResolvedValue({ confirm: true })
 
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
-    expect(sdkDouble.callLog()).toContain('vault.withdraw')
+    expect(sdkDouble.callArgs('vault.withdraw')).toEqual([['10']])
+    expect(sdkDouble.callCount('vault.withdraw')).toBe(1)
     expect(spinnerDouble.succeed).toHaveBeenCalledWith('Withdrawal requested')
     expect(exits.codes).toEqual([])
+  })
+
+  it('reads the balance and withdrawal info for the wallet address', async () => {
+    promptDouble.mockResolvedValue({ confirm: true })
+
+    const program = createProgram()
+    await program.parseAsync(BASE, { from: 'user' })
+
+    expect(sdkDouble.callArgs('vault.getBalance')).toEqual([[TEST_WALLET_ADDRESS]])
+    expect(sdkDouble.callArgs('vault.getWithdrawalInfo')).toEqual([[TEST_WALLET_ADDRESS]])
   })
 
   it('estimates the USDC value from shares and share price', async () => {
@@ -124,6 +137,7 @@ describe('withdraw command', () => {
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
+    expect(sdkDouble.callCount('vault.withdraw')).toBe(0)
     expect(sdkDouble.calledTransaction()).toBe(false)
     expect(capture.logs.join('\n')).toContain('Cancelled')
   })
@@ -138,6 +152,7 @@ describe('withdraw command', () => {
     ).rejects.toThrow(/Private key required/)
 
     expect(exits.codes).toEqual([])
+    expect(sdkDouble.calledTransaction()).toBe(false)
   })
 
   it('reports a failed withdrawal and exits', async () => {
@@ -152,5 +167,6 @@ describe('withdraw command', () => {
 
     expect(exits.codes).toEqual([1])
     expect(capture.errors.join('\n')).toContain('withdraw failed')
+    expect(sdkDouble.callArgs('vault.withdraw')).toEqual([['10']])
   })
 })

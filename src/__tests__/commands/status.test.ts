@@ -23,6 +23,7 @@ import {
   installExitSentinel,
   TEST_PRIVATE_KEY,
   TEST_RPC_URL,
+  TEST_WALLET_ADDRESS,
 } from '../helpers/harness'
 
 describe('status command', () => {
@@ -34,6 +35,7 @@ describe('status command', () => {
     capture = captureConsole()
     exits = installExitSentinel()
     vi.stubEnv('PRIVATE_KEY', '')
+    vi.stubEnv('RPC_URL', '')
   })
 
   afterEach(() => {
@@ -50,6 +52,7 @@ describe('status command', () => {
     expect(output).toContain('Vault Overview')
     expect(output).toContain('Set a private key to see your position')
     expect(output).not.toContain('Your Position')
+    expect(sdkDouble.callCount('vault.getBalance')).toBe(0)
     expect(exits.codes).toEqual([])
   })
 
@@ -62,6 +65,7 @@ describe('status command', () => {
     const output = capture.logs.join('\n')
     expect(output).toContain('Your Position')
     expect(output).not.toContain('Set a private key to see your position')
+    expect(sdkDouble.callArgs('vault.getBalance')).toEqual([[TEST_WALLET_ADDRESS]])
   })
 
   it('reports a failed status fetch and exits', async () => {
