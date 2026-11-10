@@ -113,4 +113,3 @@ builds it, then runs typecheck, the coverage-gated test suite, the build, and a
 smoke test of the built binary. The test step is deliberately **not**
 `npm test --if-present`: a missing or failing test script must fail the build
 rather than pass silently.
-

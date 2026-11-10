@@ -65,7 +65,18 @@ describe('balance command', () => {
     await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'balance'], { from: 'user' })
 
     expect(sdkDouble.callArgs('vault.getBalance')).toEqual([[TEST_WALLET_ADDRESS]])
+    expect(sdkDouble.callArgs('token.getBalance')).toEqual([[TEST_WALLET_ADDRESS]])
     expect(capture.logs.join('\n')).toContain('Vault Position')
+  })
+
+  it('prefers the explicit address over the wallet address', async () => {
+    vi.stubEnv('PRIVATE_KEY', TEST_PRIVATE_KEY)
+
+    const program = createProgram()
+    await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'balance', TEST_ADDRESS], { from: 'user' })
+
+    expect(sdkDouble.callArgs('vault.getBalance')).toEqual([[TEST_ADDRESS]])
+    expect(sdkDouble.callArgs('token.getBalance')).toEqual([[TEST_ADDRESS]])
   })
 
   it('exits when neither an address nor a wallet is available', async () => {
