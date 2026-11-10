@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 
-const parse = vi.fn()
+const parseAsync = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('../cli.js', () => ({
-  createProgram: () => ({ parse }),
+  createProgram: () => ({ parseAsync }),
 }))
 
 describe('entry point', () => {
-  it('parses the process arguments', async () => {
+  it('parses the process arguments and awaits the action', async () => {
     await import('../index.js')
-    expect(parse).toHaveBeenCalledTimes(1)
+    expect(parseAsync).toHaveBeenCalledTimes(1)
   })
 })
