@@ -21,7 +21,8 @@
     "verify:publishable": "node scripts/verify-publishable.mjs",
     "prepublishOnly": "npm run verify:publishable",
     "prepack": "node scripts/prepare-release-manifest.mjs",
-    "postpack": "node scripts/restore-release-manifest.mjs"
+    "postpack": "node scripts/restore-release-manifest.mjs",
+    "restore:release-manifest": "node scripts/restore-release-manifest.mjs"
   },
   "dependencies": {
     "chalk": "^5.3.0",

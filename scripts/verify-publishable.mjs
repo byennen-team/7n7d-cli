@@ -21,6 +21,14 @@ const root = resolve(import.meta.dirname, '..')
 const LOCAL_SPEC = /^(file:|link:|workspace:|\.{1,2}\/|\/)/
 const DEP_FIELDS = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']
 
+/**
+ * Run a command and return its stdout.
+ *
+ * @param {string} cmd executable to run
+ * @param {string[]} args arguments passed to the executable
+ * @param {object} [opts] extra options forwarded to execFileSync
+ * @returns {string} captured stdout
+ */
 function run(cmd, args, opts = {}) {
   return execFileSync(cmd, args, {
     encoding: 'utf8',
@@ -29,6 +37,13 @@ function run(cmd, args, opts = {}) {
   })
 }
 
+/**
+ * Fail when a manifest points at a path that only exists on this machine.
+ *
+ * @param {Record<string, Record<string, string>>} manifest parsed package manifest
+ * @param {string} label human readable description of the manifest source
+ * @returns {void}
+ */
 function assertNoLocalSpecs(manifest, label) {
   for (const field of DEP_FIELDS) {
     for (const [name, spec] of Object.entries(manifest[field] ?? {})) {
@@ -37,6 +52,28 @@ function assertNoLocalSpecs(manifest, label) {
       }
     }
   }
+}
+
+/**
+ * Run the installed CLI binary and return its output.
+ *
+ * npm installs a POSIX shim on unix and a `.cmd` shim on Windows. Node
+ * refuses to execute `.cmd` files directly, so on Windows the shim is
+ * launched through the command interpreter with every argument quoted, which
+ * keeps the argument boundaries intact. Other platforms keep the direct
+ * execution path.
+ *
+ * @param {string} binPath path of the installed bin shim
+ * @param {string[]} args arguments to pass to the CLI
+ * @returns {string} captured stdout of the CLI
+ */
+function runInstalledCli(binPath, args) {
+  if (process.platform === 'win32') {
+    const shell = process.env.ComSpec || 'cmd.exe'
+    const quoted = args.map((arg) => '"' + arg + '"').join(' ')
+    return run(shell, ['/d', '/s', '/c', '"' + binPath + '" ' + quoted])
+  }
+  return run(binPath, args)
 }
 
 const tmp = mkdtempSync(join(tmpdir(), 'cli-publish-'))
@@ -69,8 +106,8 @@ try {
   )
   run('npm', ['install', tarball, '--omit=dev', '--no-audit', '--no-fund'], { cwd: consumer })
 
-  const bin = join(consumer, 'node_modules', '.bin', '7n7d')
-  const help = run(bin, ['--help'])
+  const bin = join(consumer, 'node_modules', '.bin', process.platform === 'win32' ? '7n7d.cmd' : '7n7d')
+  const help = runInstalledCli(bin, ['--help'])
   for (const command of ['balance', 'status', 'deposit', 'withdraw', 'approve']) {
     if (!help.includes(command)) throw new Error(`installed CLI did not list ${command}`)
   }
