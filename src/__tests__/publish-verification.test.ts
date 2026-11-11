@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { createRunner } from '../../scripts/lib/exec.mjs'
 import { verifyPublishable } from '../../scripts/lib/publish-verification.mjs'
@@ -55,12 +58,17 @@ describe('verifyPublishable', () => {
     const spawned: { file: string; args: string[]; opts: Record<string, unknown> }[] = []
     const exec = (file: string, args: string[], opts: Record<string, unknown>) => {
       spawned.push({ file, args, opts })
-      if (args[0] === 'pack') return '7n7d-1.0.0.tgz\n'
-      if (args[0] === '-xzOf') return JSON.stringify({ name: '7n7d', version: '1.0.0' })
+      // The interpreter arguments start with /d, so the npm sub-command is
+      // recognised from the command line the runner assembled.
+      const commandLine = args[args.length - 1] ?? ''
+      if (file === 'cmd.exe' && commandLine.includes('"pack"')) return '7n7d-1.0.0.tgz\n'
+      if (file === 'cmd.exe' && commandLine.includes('"install"')) return ''
+      if (file === 'tar') return JSON.stringify({ name: '7n7d', version: '1.0.0' })
       return 'balance status deposit withdraw approve'
     }
     const run = createRunner({
       platform: 'win32',
+      comspec: undefined,
       execPath: 'C:\\nodejs\\node.exe',
       npmExecPath: undefined,
       exec,
@@ -81,10 +89,61 @@ describe('verifyPublishable', () => {
     expect(tarCall?.file).toBe('tar')
     expect(tarCall?.opts.windowsVerbatimArguments).toBeUndefined()
 
+    // The packed tarball has to travel from npm pack to tar and npm install:
+    // npm pack prints the tarball name, which is then unpacked and installed.
+    const packCall = npmCalls.find((call) => call.args[4].includes('"pack"'))
+    expect(packCall?.args[4]).toContain('"--pack-destination"')
+    expect(tarCall?.args[1]).toContain('7n7d-1.0.0.tgz')
+    const installCall = npmCalls.find((call) => call.args[4].includes('"install"'))
+    expect(installCall?.args[4]).toContain('7n7d-1.0.0.tgz')
+
     // The installed binary is a .cmd shim on Windows.
     const cliCall = spawned.find((call) => call.args.some((arg) => arg.includes('--help')))
     expect(cliCall?.file).toBe('cmd.exe')
     expect(cliCall?.args[4]).toContain('7n7d.cmd')
+  })
+
+  it('rejects a manifest that still points at a local path', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cli-verify-root-'))
+    mkdirSync(join(root, 'dist'))
+    mkdirSync(join(root, 'scripts'))
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({
+        name: '7n7d',
+        version: '1.0.0',
+        dependencies: { '@7n7d/sdk': 'file:../7n7d-sdk' },
+      }),
+    )
+
+    try {
+      expect(() =>
+        verifyPublishable({
+          run: () => '',
+          root,
+        }),
+      ).toThrow(/points at a local path/u)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('removes the scratch directory when a command fails', () => {
+    const scratch = mkdtempSync(join(tmpdir(), 'cli-verify-scratch-'))
+    try {
+      expect(() =>
+        verifyPublishable({
+          run: (command: string, args: string[] = []) => {
+            if (command === 'npm' && args[0] === 'pack') throw new Error('pack failed')
+            return ''
+          },
+          tmpDir: scratch,
+        }),
+      ).toThrow(/pack failed/u)
+      expect(readdirSync(scratch)).toEqual([])
+    } finally {
+      rmSync(scratch, { recursive: true, force: true })
+    }
   })
 
   it('propagates a failing command', () => {

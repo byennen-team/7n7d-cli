@@ -1,6 +1,6 @@
-import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { runCommand } from '../../scripts/lib/exec.mjs'
 
 /**
  * Builds the sibling SDK package once before the suite runs.
@@ -15,7 +15,9 @@ function buildSdkIfNeeded(): void {
   }
 
   try {
-    execFileSync('npm', ['run', 'build'], { cwd: sdkDir, stdio: 'inherit' })
+    // The runner resolves the platform specific way to launch npm: npm is a
+    // `.cmd` shim on Windows and cannot be executed directly there.
+    runCommand('npm', ['run', 'build'], { cwd: sdkDir, stdio: 'inherit' })
   } catch (error) {
     throw new Error(
       `The sibling SDK at ${sdkDir} has no build output and could not be built. ` +
@@ -36,7 +38,7 @@ function buildSdkIfNeeded(): void {
 export default function setup(): void {
   buildSdkIfNeeded()
 
-  execFileSync('npm', ['run', 'build'], { cwd: process.cwd(), stdio: 'inherit' })
+  runCommand('npm', ['run', 'build'], { cwd: process.cwd(), stdio: 'inherit' })
 
   const bundle = resolve(process.cwd(), 'dist', 'index.js')
   if (!existsSync(bundle)) {
