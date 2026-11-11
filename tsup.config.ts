@@ -7,6 +7,9 @@ export default defineConfig({
   clean: true,
   dts: false,
   splitting: false,
+  // @7n7d/sdk is not published to npm. It is bundled into dist/ so the
+  // published package has no local-path dependency and stays installable.
+  noExternal: ['@7n7d/sdk'],
   banner: {
     js: '#!/usr/bin/env node',
   },

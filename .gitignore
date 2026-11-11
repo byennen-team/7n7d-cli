@@ -4,3 +4,6 @@ coverage/
 .vitest/
 .env
 *.tgz
+.release/
+.publish-tarball.txt
+.release-manifest.backup.json
