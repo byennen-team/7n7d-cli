@@ -8,6 +8,9 @@ export interface CLIOptions {
   rpcUrl?: string
 }
 
+/**
+ * Builds an SDK client from CLI options and environment variables.
+ */
 export function createSDK(opts: CLIOptions): SevenNSevenD {
   const network = (opts.network || process.env.NETWORK || 'testnet') as Network
   const rpcUrl = opts.rpcUrl || process.env.RPC_URL
@@ -26,6 +29,9 @@ export function createSDK(opts: CLIOptions): SevenNSevenD {
   })
 }
 
+/**
+ * Asserts the SDK client has a wallet address, i.e. a private key was configured.
+ */
 export function requireWallet(sdk: SevenNSevenD): asserts sdk is SevenNSevenD & { address: `0x${string}` } {
   if (!sdk.address) {
     throw new Error('Private key required. Set PRIVATE_KEY in your environment or .env')

@@ -5,6 +5,9 @@ import type { Command } from 'commander'
 import { createSDK, requireWallet, type CLIOptions } from '../config.js'
 import { heading, label, usdcAmount, txHash, success, separator, networkBadge } from '../display.js'
 
+/**
+ * Registers the approve command on the program.
+ */
 export function registerApprove(program: Command) {
   program
     .command('approve')

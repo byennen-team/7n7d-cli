@@ -4,6 +4,9 @@ import type { Command } from 'commander'
 import { createSDK, type CLIOptions } from '../config.js'
 import { heading, label, usdcAmount, sharesAmount, box, separator, networkBadge } from '../display.js'
 
+/**
+ * Registers the status command on the program.
+ */
 export function registerStatus(program: Command) {
   program
     .command('status')

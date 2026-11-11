@@ -4,6 +4,9 @@ import type { Command } from 'commander'
 import { createSDK, type CLIOptions } from '../config.js'
 import { heading, label, usdcAmount, sharesAmount, tokenAmount, box, separator, networkBadge } from '../display.js'
 
+/**
+ * Registers the balance command on the program.
+ */
 export function registerBalance(program: Command) {
   program
     .command('balance')

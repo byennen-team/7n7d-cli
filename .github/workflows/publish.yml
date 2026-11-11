@@ -27,35 +27,68 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write  # Required for npm provenance
+      id-token: write # Required for npm provenance
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      # The CLI depends on "@7n7d/sdk": "file:../7n7d-sdk". The SDK is
+      # checked out as a sibling directory at a pinned revision and built
+      # first, so the test step resolves the real package.
+      - name: Checkout CLI
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           persist-credentials: false
+          path: cli
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      - name: Checkout SDK (sibling)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          repository: byennen-team/7n7d-sdk
+          ref: bd7eb3d7e82a177e8e4999170cb88084608c0c77
+          persist-credentials: false
+          path: 7n7d-sdk
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
           # No dependency cache in the release workflow: a cache written by an untrusted
           # run could be restored here and end up in the published package.
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install SDK dependencies
+        working-directory: 7n7d-sdk
+        run: npm ci --no-audit --no-fund
 
+      - name: Build SDK
+        working-directory: 7n7d-sdk
+        run: npm run build
+
+      - name: Install dependencies
+        working-directory: cli
+        run: npm ci --no-audit --no-fund
+
+      - name: Type check
+        working-directory: cli
+        run: npm run typecheck
+
+      # No --if-present: publishing must not ship a package whose test gate
+      # never ran.
       - name: Test
-        run: npm test --if-present
+        working-directory: cli
+        run: npm run test:coverage
 
       - name: Build
+        working-directory: cli
         run: npm run build
 
       - name: Publish to npm
+        working-directory: cli
         if: ${{ (github.event_name == 'release' && github.event.release.target_commitish == 'main') || (github.event_name == 'workflow_dispatch' && inputs.dry_run == false && github.ref == 'refs/heads/main') }}
         run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Dry run publish
+        working-directory: cli
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
         run: npm publish --access public --dry-run
