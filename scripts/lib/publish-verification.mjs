@@ -51,9 +51,11 @@ export function verifyPublishable({ run, root = resolve(import.meta.dirname, '..
     const stage = join(tmp, 'package')
     mkdirSync(stage)
 
+    // The staged manifest is written unchanged so the staged `prepack` script
+    // (scripts/prepare-release-manifest.mjs) performs the real release
+    // transform. Pre-stripping it here would let a defect in that script pass
+    // this verification and still break the real npm publish.
     const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
-    if (pkg.devDependencies?.['@7n7d/sdk']) delete pkg.devDependencies['@7n7d/sdk']
-    assertNoLocalSpecs(pkg, 'release manifest')
     writeFileSync(join(stage, 'package.json'), JSON.stringify(pkg, null, 2) + '\n')
 
     cpSync(join(root, 'dist'), join(stage, 'dist'), { recursive: true })

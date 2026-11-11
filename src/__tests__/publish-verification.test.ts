@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -103,8 +103,39 @@ describe('verifyPublishable', () => {
     expect(cliCall?.args[4]).toContain('7n7d.cmd')
   })
 
-  it('rejects a manifest that still points at a local path', () => {
+  it('rejects a packed manifest that still points at a local path', () => {
     const root = mkdtempSync(join(tmpdir(), 'cli-verify-root-'))
+    mkdirSync(join(root, 'dist'))
+    mkdirSync(join(root, 'scripts'))
+    writeFileSync(
+      join(root, 'package.json'),
+      JSON.stringify({ name: '7n7d', version: '1.0.0' }),
+    )
+
+    try {
+      expect(() =>
+        verifyPublishable({
+          run: (command: string, args: string[] = []) => {
+            if (command === 'npm' && args[0] === 'pack') return '7n7d-1.0.0.tgz\n'
+            if (command === 'tar') {
+              return JSON.stringify({
+                name: '7n7d',
+                version: '1.0.0',
+                dependencies: { '@7n7d/sdk': 'file:../7n7d-sdk' },
+              })
+            }
+            return ''
+          },
+          root,
+        }),
+      ).toThrow(/packed manifest dependencies\.@7n7d\/sdk points at a local path/u)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('stages the real manifest so the prepack transform is exercised', () => {
+    const root = mkdtempSync(join(tmpdir(), 'cli-verify-stage-'))
     mkdirSync(join(root, 'dist'))
     mkdirSync(join(root, 'scripts'))
     writeFileSync(
@@ -112,17 +143,32 @@ describe('verifyPublishable', () => {
       JSON.stringify({
         name: '7n7d',
         version: '1.0.0',
-        dependencies: { '@7n7d/sdk': 'file:../7n7d-sdk' },
+        devDependencies: { '@7n7d/sdk': 'file:../7n7d-sdk' },
+        scripts: { prepack: 'node scripts/prepare-release-manifest.mjs' },
       }),
     )
 
+    let staged: Record<string, unknown> | undefined
     try {
-      expect(() =>
-        verifyPublishable({
-          run: () => '',
-          root,
-        }),
-      ).toThrow(/points at a local path/u)
+      verifyPublishable({
+        run: (command: string, args: string[] = [], opts: Record<string, unknown> = {}) => {
+          if (command === 'npm' && args[0] === 'pack') {
+            staged = JSON.parse(
+              readFileSync(join(String(opts.cwd), 'package.json'), 'utf8'),
+            )
+            return '7n7d-1.0.0.tgz\n'
+          }
+          if (command === 'tar') return JSON.stringify({ name: '7n7d', version: '1.0.0' })
+          return 'balance status deposit withdraw approve'
+        },
+        root,
+      })
+
+      // The staged manifest must still carry the local-path devDependency, so
+      // the staged prepack script performs the real release transform.
+      expect(
+        (staged?.devDependencies as Record<string, string>)['@7n7d/sdk'],
+      ).toBe('file:../7n7d-sdk')
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
