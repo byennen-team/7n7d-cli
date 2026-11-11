@@ -63,6 +63,9 @@ const DEFAULTS: Record<string, unknown> = {
   'token.getBalance': '0',
 }
 
+/**
+ * Returns a fake SDK client for tests.
+ */
 export const sdkDouble = {
   instances: [] as SdkDouble[],
   calls: [] as SdkCall[],
@@ -104,6 +107,9 @@ export const sdkDouble = {
   },
 }
 
+/**
+ * Builds a module double that exports the given SDK surface.
+ */
 function buildModule(prefix: 'vault' | 'token', methods: readonly string[]): Record<string, Handler> {
   const module: Record<string, Handler> = {}
   for (const method of methods) {

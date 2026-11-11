@@ -11,6 +11,9 @@ function createSpinner() {
   return spinner
 }
 
+/**
+ * Returns a fake ora spinner that records its calls.
+ */
 export const spinnerDouble = createSpinner()
 
 /** Default export replacement for `ora`. */

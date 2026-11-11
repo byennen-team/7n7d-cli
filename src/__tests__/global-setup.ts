@@ -2,6 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
 
+/**
+ * Builds the sibling SDK package once before the suite runs.
+ */
 function buildSdkIfNeeded(): void {
   const sdkDir = resolve(process.cwd(), '..', '7n7d-sdk')
   if (!existsSync(resolve(sdkDir, 'package.json'))) {

@@ -5,6 +5,9 @@ import type { Command } from 'commander'
 import { createSDK, requireWallet, type CLIOptions } from '../config.js'
 import { heading, label, usdcAmount, sharesAmount, txHash, success, separator, networkBadge } from '../display.js'
 
+/**
+ * Registers the deposit command on the program.
+ */
 export function registerDeposit(program: Command) {
   program
     .command('deposit')
