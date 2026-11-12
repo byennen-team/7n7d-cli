@@ -58,12 +58,16 @@ describe('createProgram', () => {
     expect(byName.get('approve')?.registeredArguments[0].required).toBe(true)
   })
 
-  it('declares the global options with a testnet default', () => {
+  it('declares the global options and documents the network fallback', () => {
     const options = createProgram().options
     const longs = options.map((option) => option.long)
     expect(longs).toContain('--network')
     expect(longs).toContain('--rpc-url')
-    expect(options.find((option) => option.long === '--network')?.defaultValue).toBe('testnet')
+    const network = options.find((option) => option.long === '--network')
+    // No Commander default: a default would shadow the NETWORK env var.
+    expect(network?.defaultValue).toBeUndefined()
+    expect(network?.description).toContain('NETWORK')
+    expect(network?.description).toContain('testnet')
   })
 
   it('does not accept a private key on the command line', () => {
@@ -81,12 +85,29 @@ describe('createProgram', () => {
     expect(sdkDouble.instances[0].network).toBe('mainnet')
   })
 
-  // Known precedence defect, pinned deliberately: the --network option has a
-  // default of 'testnet', so program.opts().network is always set and
-  // createSDK() never falls back to the NETWORK environment variable. The env
-  // var is therefore ignored unless the flag is passed explicitly.
-  it('ignores the NETWORK environment variable in favour of the default (known defect)', async () => {
+  it('honours the NETWORK environment variable when --network is not passed', async () => {
     vi.stubEnv('NETWORK', 'mainnet')
+
+    const program = createProgram()
+    await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'status'], { from: 'user' })
+
+    expect(sdkDouble.instances[0].network).toBe('mainnet')
+  })
+
+  it('prefers the --network flag over the NETWORK environment variable', async () => {
+    vi.stubEnv('NETWORK', 'mainnet')
+
+    const program = createProgram()
+    await program.parseAsync(
+      ['--network', 'testnet', '--rpc-url', TEST_RPC_URL, 'status'],
+      { from: 'user' },
+    )
+
+    expect(sdkDouble.instances[0].network).toBe('testnet')
+  })
+
+  it('defaults to testnet when neither the flag nor NETWORK is set', async () => {
+    vi.stubEnv('NETWORK', '')
 
     const program = createProgram()
     await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'status'], { from: 'user' })
@@ -95,10 +116,12 @@ describe('createProgram', () => {
   })
 
   it('prints the banner before a command runs', async () => {
+    vi.stubEnv('NETWORK', '')
+
     const program = createProgram()
     await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'status'], { from: 'user' })
 
     expect(capture.logs.join('\n')).toContain('AI-Powered DeFi Trading Vault')
-    expect(program.opts().network).toBe('testnet')
+    expect(sdkDouble.instances[0].network).toBe('testnet')
   })
 })

@@ -68,9 +68,12 @@ Read-only commands (`balance`, `status`) work without a private key. Write comma
 ### Options
 
 ```bash
---network testnet|mainnet             # Default: testnet
+--network testnet|mainnet             # Or set NETWORK in .env
 --rpc-url <url>                       # Or set RPC_URL in .env
 ```
+
+The network is resolved in this order: the `--network` flag, then the `NETWORK`
+environment variable, then `testnet`. An empty `NETWORK` counts as unset.
 
 ### Examples
 
