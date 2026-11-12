@@ -1,3 +1,4 @@
+import { formatShares } from '@7n7d/sdk'
 import chalk from 'chalk'
 import ora from 'ora'
 import inquirer from 'inquirer'
@@ -40,7 +41,7 @@ export function registerWithdraw(program: Command) {
 
         if (withdrawalInfo.shares > 0n) {
           console.log(chalk.yellow('  You have a pending withdrawal'))
-          console.log(label('Pending Shares', sharesAmount(withdrawalInfo.shares.toString())))
+          console.log(label('Pending Shares', sharesAmount(formatShares(withdrawalInfo.shares))))
           console.log(label('Ready', withdrawalInfo.isReady ? chalk.green('Yes') : chalk.yellow('No')))
           console.log()
         }

@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@7n7d/sdk', async () => {
   const { SdkDouble } = await import('../helpers/sdk-double')
-  return { SevenNSevenD: SdkDouble }
+  // The CLI formats pending shares with the SDK's helper, so the real
+  // implementation stays in the mock: a stubbed one would not catch a wrong
+  // decimal scale.
+  const actual = await vi.importActual<typeof import('@7n7d/sdk')>('@7n7d/sdk')
+  return { SevenNSevenD: SdkDouble, formatShares: actual.formatShares }
 })
 
 vi.mock('ora', async () => {
@@ -37,8 +41,8 @@ const BASE = ['--rpc-url', TEST_RPC_URL, 'withdraw', '10']
 
 /**
  * The real SDK returns pending shares as base units (18 decimals), so one
- * share is 10^18. The CLI prints `withdrawalInfo.shares.toString()` without
- * formatting them.
+ * share is 10^18. The CLI formats them with the SDK's `formatShares` before
+ * printing, so a pending 5 shares reads as "5 shares".
  */
 const ONE_SHARE = 10n ** 18n
 
@@ -154,11 +158,7 @@ describe('withdraw command', () => {
     expect(output).toContain('No')
   })
 
-  // Known display defect, pinned deliberately: the pending-share figure is
-  // printed as the raw base-unit bigint rather than a formatted share count,
-  // so 5 shares renders as 5000000000000000000. This test exists to make the
-  // defect visible and to force an update when it is fixed.
-  it('prints pending shares as raw base units (known display defect)', async () => {
+  it('prints pending shares as a formatted share count', async () => {
     sdkDouble.overrides['vault.getWithdrawalInfo'] = async () => ({
       shares: 5n * ONE_SHARE,
       assets: 5n * ONE_SHARE,
@@ -170,7 +170,26 @@ describe('withdraw command', () => {
     const program = createProgram()
     await program.parseAsync(BASE, { from: 'user' })
 
-    expect(capture.logs.join('\n')).toContain('5000000000000000000 shares')
+    const output = capture.logs.join('\n')
+    expect(output).toContain('5 shares')
+    expect(output).not.toContain('5000000000000000000')
+  })
+
+  it('prints fractional pending shares without truncating them', async () => {
+    sdkDouble.overrides['vault.getWithdrawalInfo'] = async () => ({
+      shares: (15n * ONE_SHARE) / 10n,
+      assets: (15n * ONE_SHARE) / 10n,
+      unlockTime: 0n,
+      isReady: true,
+    })
+    promptDouble.mockResolvedValue({ confirm: true })
+
+    const program = createProgram()
+    await program.parseAsync(BASE, { from: 'user' })
+
+    const output = capture.logs.join('\n')
+    expect(output).toContain('1.5 shares')
+    expect(output).not.toContain('1500000000000000000')
   })
 
   it('does not withdraw while the confirmation is still pending', async () => {
