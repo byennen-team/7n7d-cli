@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { SevenNSevenD } from '@7n7d/sdk'
+import { SevenNSevenD, formatShares } from '@7n7d/sdk'
 
 /**
  * Compatibility guard.
@@ -29,6 +29,12 @@ describe('SDK contract', () => {
       expect(typeof sdk.vault[method], `vault.${method}`).toBe('function')
     }
     expect(typeof sdk.token.getBalance).toBe('function')
+  })
+
+  it('exposes the share formatter the CLI calls', () => {
+    expect(typeof formatShares).toBe('function')
+    expect(formatShares(5n * 10n ** 18n)).toBe('5')
+    expect(formatShares(15n * 10n ** 17n)).toBe('1.5')
   })
 
   it('reports the configured network', () => {
