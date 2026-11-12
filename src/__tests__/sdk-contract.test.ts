@@ -34,6 +34,7 @@ describe('SDK contract', () => {
   it('exposes the share formatter the CLI calls', () => {
     expect(typeof formatShares).toBe('function')
     expect(formatShares(5n * 10n ** 18n)).toBe('5')
+    expect(formatShares(15n * 10n ** 17n)).toBe('1.5')
   })
 
   it('reports the configured network', () => {

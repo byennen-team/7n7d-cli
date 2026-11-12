@@ -2,9 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@7n7d/sdk', async () => {
   const { SdkDouble } = await import('../helpers/sdk-double')
-  // The CLI formats pending shares with the SDK's helper, so the real
-  // implementation stays in the mock: a stubbed one would not catch a wrong
-  // decimal scale.
+  // Real formatShares: a stub would not catch a wrong decimal scale.
   const actual = await vi.importActual<typeof import('@7n7d/sdk')>('@7n7d/sdk')
   return { SevenNSevenD: SdkDouble, formatShares: actual.formatShares }
 })
@@ -171,6 +169,7 @@ describe('withdraw command', () => {
     await program.parseAsync(BASE, { from: 'user' })
 
     const output = capture.logs.join('\n')
+    expect(output).toContain('Pending Shares')
     expect(output).toContain('5 shares')
     expect(output).not.toContain('5000000000000000000')
   })
@@ -188,6 +187,7 @@ describe('withdraw command', () => {
     await program.parseAsync(BASE, { from: 'user' })
 
     const output = capture.logs.join('\n')
+    expect(output).toContain('Pending Shares')
     expect(output).toContain('1.5 shares')
     expect(output).not.toContain('1500000000000000000')
   })
