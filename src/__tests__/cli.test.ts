@@ -91,6 +91,7 @@ describe('createProgram', () => {
     const program = createProgram()
     await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'status'], { from: 'user' })
 
+    expect(sdkDouble.instances).toHaveLength(1)
     expect(sdkDouble.instances[0].network).toBe('mainnet')
   })
 
@@ -103,15 +104,18 @@ describe('createProgram', () => {
       { from: 'user' },
     )
 
+    expect(sdkDouble.instances).toHaveLength(1)
     expect(sdkDouble.instances[0].network).toBe('testnet')
   })
 
   it('defaults to testnet when neither the flag nor NETWORK is set', async () => {
+    // An empty value counts as unset, exactly like an absent variable.
     vi.stubEnv('NETWORK', '')
 
     const program = createProgram()
     await program.parseAsync(['--rpc-url', TEST_RPC_URL, 'status'], { from: 'user' })
 
+    expect(sdkDouble.instances).toHaveLength(1)
     expect(sdkDouble.instances[0].network).toBe('testnet')
   })
 

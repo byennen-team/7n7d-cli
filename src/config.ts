@@ -12,12 +12,7 @@ export interface CLIOptions {
  * Builds an SDK client from CLI options and environment variables.
  */
 export function createSDK(opts: CLIOptions): SevenNSevenD {
-  // Network precedence: the --network flag wins, then the NETWORK environment
-  // variable, then testnet. The CLI declares --network without a Commander
-  // default on purpose: a default would always be truthy and would shadow the
-  // environment variable. An empty NETWORK value counts as unset and falls
-  // back to testnet. The value is cast rather than validated, so an unknown
-  // network name is passed through to the SDK unchanged.
+  // No Commander default on --network: it would always shadow the NETWORK env var.
   const network = (opts.network || process.env.NETWORK || 'testnet') as Network
   const rpcUrl = opts.rpcUrl || process.env.RPC_URL
   // Read only from the environment: a CLI flag would leak the key into shell
